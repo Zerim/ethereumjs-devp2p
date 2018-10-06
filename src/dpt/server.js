@@ -1,5 +1,4 @@
 const { EventEmitter } = require('events')
-const dgram = require('dgram')
 const ms = require('ms')
 const createDebugLogger = require('debug')
 const LRUCache = require('lru-cache')
@@ -8,7 +7,6 @@ const { keccak256, pk2id, createDeferred } = require('../util')
 
 const debug = createDebugLogger('devp2p:dpt:server')
 const VERSION = 0x04
-const createSocketUDP4 = dgram.createSocket.bind(null, 'udp4')
 
 class Server extends EventEmitter {
   constructor (dpt, privateKey, options) {
@@ -23,8 +21,11 @@ class Server extends EventEmitter {
     this._parityRequestMap = new Map()
     this._requestsCache = new LRUCache({ max: 1000, maxAge: ms('1s'), stale: false })
 
-    const createSocket = options.createSocket || createSocketUDP4
-    this._socket = createSocket()
+    if (typeof options.createSocket !== 'function') {
+      throw new Error("Must provide valid createSocket function (should implement Node's 'dgram' module 'createSocket' interface).")
+    }
+
+    this._socket = options.createSocket()
     this._socket.once('listening', () => this.emit('listening'))
     this._socket.once('close', () => this.emit('close'))
     this._socket.on('error', (err) => this.emit('error', err))
